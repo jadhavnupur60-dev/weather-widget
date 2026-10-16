@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A responsive weather widget to check current weather conditions in any city.">
+
+    <title>Weather Widget</title>
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+    <main class="weather-container">
+        <div class="weather-heading" aria-hidden="true">🌤️</div>
+
+        <h1>Weather Widget</h1>
+        <p class="subtitle">Check the current weather of any city</p>
+
+        <form id="weatherForm">
+            <label for="apiKey">OpenWeatherMap API Key</label>
+            <input
+                type="password"
+                id="apiKey"
+                placeholder="Enter your API key"
+                autocomplete="off"
+                required
+            >
+
+            <label for="cityInput">City Name</label>
+            <input
+                type="text"
+                id="cityInput"
+                placeholder="Enter city name, e.g. Pune"
+                autocomplete="off"
+                maxlength="100"
+                required
+            >
+
+            <button type="submit" id="searchButton">
+                Get Weather
+            </button>
+        </form>
+
+        <p id="status" role="status" aria-live="polite"></p>
+
+        <section id="weatherResult" aria-label="Weather results" hidden>
+            <h2 id="cityName"></h2>
+
+            <img id="weatherIcon" class="weather-icon" alt="">
+
+            <p id="temperature" class="temperature"></p>
+            <p id="description" class="description"></p>
+
+            <div class="weather-details">
+                <p>
+                    <span>Feels like</span>
+                    <strong id="feelsLike"></strong>
+                </p>
+                <p>
+                    <span>Humidity</span>
+                    <strong id="humidity"></strong>
+                </p>
+                <p>
+                    <span>Wind speed</span>
+                    <strong id="windSpeed"></strong>
+                </p>
+            </div>
+        </section>
+
+        <footer>
+            Weather data provided by OpenWeatherMap
+        </footer>
+    </main>
+</body>
+</html>
