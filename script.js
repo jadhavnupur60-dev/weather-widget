@@ -1,109 +1,229 @@
 
-const form = document.getElementById("weatherForm");
+const weatherForm = document.getElementById("weatherForm");
 const apiKeyInput = document.getElementById("apiKey");
 const cityInput = document.getElementById("cityInput");
-const searchButton = document.getElementById("searchButton");
-const statusMessage = document.getElementById("status");
+const addFavoriteBtn = document.getElementById("addFavoriteBtn");
 const weatherResult = document.getElementById("weatherResult");
+const favoritesList = document.getElementById("favoritesList");
+const message = document.getElementById("message");
 
-const cityName = document.getElementById("cityName");
-const weatherIcon = document.getElementById("weatherIcon");
-const temperature = document.getElementById("temperature");
-const description = document.getElementById("description");
-const feelsLike = document.getElementById("feelsLike");
-const humidity = document.getElementById("humidity");
-const windSpeed = document.getElementById("windSpeed");
+const STORAGE_KEY = "weatherFavoriteCities";
 
-async function getWeather(city, apiKey) {
-    statusMessage.textContent = "Loading weather...";
-    weatherResult.hidden = true;
-    searchButton.disabled = true;
+// Read saved cities from localStorage.
+function loadFavorites() {
+    try {
+        const savedCities = JSON.parse(
+            localStorage.getItem(STORAGE_KEY) || "[]"
+        );
+
+        if (!Array.isArray(savedCities)) {
+            return [];
+        }
+
+        return savedCities.filter(
+            city => typeof city === "string" && city.trim() !== ""
+        );
+    } catch (error) {
+        return [];
+    }
+}
+
+// Save the current favorite city array.
+function saveFavorites(cities) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cities));
+        return true;
+    } catch (error) {
+        message.textContent =
+            "Unable to save favorites. Check your browser storage settings.";
+        return false;
+    }
+}
+
+// Display favorite cities as buttons.
+function renderFavorites() {
+    const cities = loadFavorites();
+
+    favoritesList.replaceChildren();
+
+    if (cities.length === 0) {
+        const emptyMessage = document.createElement("p");
+        emptyMessage.className = "empty-favorites";
+        emptyMessage.textContent = "No favorite cities saved yet.";
+        favoritesList.appendChild(emptyMessage);
+        return;
+    }
+
+    cities.forEach(city => {
+        const item = document.createElement("div");
+        item.className = "favorite-item";
+
+        const cityButton = document.createElement("button");
+        cityButton.type = "button";
+        cityButton.className = "favorite-city";
+        cityButton.textContent = "📍 " + city;
+
+        // Fetch weather when a favorite city is clicked.
+        cityButton.addEventListener("click", () => {
+            cityInput.value = city;
+            getWeather(city);
+        });
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "remove-favorite";
+        removeButton.textContent = "✕";
+        removeButton.setAttribute(
+            "aria-label",
+            "Remove " + city + " from favorites"
+        );
+
+        removeButton.addEventListener("click", () => {
+            removeFavorite(city);
+        });
+
+        item.append(cityButton, removeButton);
+        favoritesList.appendChild(item);
+    });
+}
+
+// Add a city without creating duplicates.
+function addFavorite() {
+    const city = cityInput.value.trim();
+
+    if (!city) {
+        message.textContent = "Please enter a city name first.";
+        cityInput.focus();
+        return;
+    }
+
+    const cities = loadFavorites();
+
+    const alreadyExists = cities.some(
+        savedCity => savedCity.toLowerCase() === city.toLowerCase()
+    );
+
+    if (alreadyExists) {
+        message.textContent = city + " is already in your favorites.";
+        return;
+    }
+
+    cities.push(city);
+
+    if (saveFavorites(cities)) {
+        renderFavorites();
+        message.textContent = city + " added to favorites!";
+    }
+}
+
+// Remove a city from favorites.
+function removeFavorite(city) {
+    const updatedCities = loadFavorites().filter(
+        savedCity => savedCity.toLowerCase() !== city.toLowerCase()
+    );
+
+    if (saveFavorites(updatedCities)) {
+        renderFavorites();
+        message.textContent = city + " removed from favorites.";
+    }
+}
+
+// Fetch weather from the OpenWeatherMap API.
+async function getWeather(city = cityInput.value.trim()) {
+    const apiKey = apiKeyInput.value.trim();
+    const cityName = city.trim();
+
+    if (!apiKey) {
+        message.textContent = "Please enter your OpenWeatherMap API key.";
+        apiKeyInput.focus();
+        return;
+    }
+
+    if (!cityName) {
+        message.textContent = "Please enter a city name.";
+        cityInput.focus();
+        return;
+    }
+
+    message.textContent = "Loading weather...";
+    weatherResult.replaceChildren();
 
     try {
         const url =
             "https://api.openweathermap.org/data/2.5/weather" +
-            `?q=${encodeURIComponent(city)}` +
-            `&appid=${encodeURIComponent(apiKey)}` +
+            "?q=" + encodeURIComponent(cityName) +
+            "&appid=" + encodeURIComponent(apiKey) +
             "&units=metric";
 
         const response = await fetch(url);
-
-        // Handle HTTP errors from the weather API.
-        if (!response.ok) {
-            if (response.status === 401) {
-                throw new Error(
-                    "Invalid API key or key not activated yet."
-                );
-            }
-
-            if (response.status === 404 || response.status === 400) {
-                throw new Error(
-                    "City not found. Please check the city name."
-                );
-            }
-
-            if (response.status === 429) {
-                throw new Error(
-                    "Too many requests. Please try again later."
-                );
-            }
-
-            throw new Error(
-                "Weather service error. Please try again."
-            );
-        }
-
         const data = await response.json();
 
-        // Read the weather details from the API response.
-        const weather = data.weather[0];
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error("Invalid API key or API key not activated.");
+            }
 
-        cityName.textContent = `${data.name}, ${data.sys.country}`;
+            if (response.status === 404) {
+                throw new Error("City not found. Check the spelling.");
+            }
+
+            throw new Error(data.message || "Unable to fetch weather.");
+        }
+
+        const card = document.createElement("div");
+        card.className = "weather-card";
+
+        const heading = document.createElement("h2");
+        heading.textContent = data.name + ", " + data.sys.country;
+
+        const icon = document.createElement("img");
+        icon.className = "weather-icon";
+        icon.alt = data.weather[0].description;
+        icon.src =
+            "https://openweathermap.org/img/wn/" +
+            data.weather[0].icon + "@2x.png";
+
+        const temperature = document.createElement("p");
         temperature.textContent =
-            `${Math.round(data.main.temp)}°C`;
-        description.textContent = weather.description;
+            "Temperature: " + data.main.temp + " °C";
 
-        feelsLike.textContent =
-            `${Math.round(data.main.feels_like)}°C`;
+        const description = document.createElement("p");
+        description.textContent =
+            "Condition: " + data.weather[0].description;
 
-        humidity.textContent = `${data.main.humidity}%`;
-        windSpeed.textContent = `${data.wind.speed} m/s`;
+        const humidity = document.createElement("p");
+        humidity.textContent =
+            "Humidity: " + data.main.humidity + "%";
 
-        // Display the weather icon.
-        weatherIcon.src =
-            `https://openweathermap.org/img/wn/${weather.icon}@2x.png`;
-        weatherIcon.alt = weather.description;
+        const wind = document.createElement("p");
+        wind.textContent =
+            "Wind Speed: " + data.wind.speed + " m/s";
 
-        weatherResult.hidden = false;
-        statusMessage.textContent = "Weather updated successfully.";
+        card.append(
+            heading,
+            icon,
+            temperature,
+            description,
+            humidity,
+            wind
+        );
+
+        weatherResult.appendChild(card);
+        message.textContent = "Weather loaded successfully.";
 
     } catch (error) {
-        console.error("Weather error:", error);
-
-        if (error instanceof TypeError) {
-            statusMessage.textContent =
-                "Network error. Check your internet connection.";
-        } else {
-            statusMessage.textContent = error.message;
-        }
-    } finally {
-        // Enable the button again after success or failure.
-        searchButton.disabled = false;
+        message.textContent = error.message;
     }
 }
 
-// Run when the user submits the form.
-form.addEventListener("submit", (event) => {
+// Handle the Get Weather form.
+weatherForm.addEventListener("submit", event => {
     event.preventDefault();
-
-    const apiKey = apiKeyInput.value.trim();
-    const city = cityInput.value.trim();
-
-    if (!apiKey || !city) {
-        statusMessage.textContent =
-            "Please enter your API key and city name.";
-        return;
-    }
-
-    getWeather(city, apiKey);
+    getWeather();
 });
+
+// Handle Add to Favorites.
+addFavoriteBtn.addEventListener("click", addFavorite);
+
+// Display saved cities when the page opens.
+renderFavorites();
